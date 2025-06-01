@@ -2,6 +2,7 @@
 #include <string>
 #include "commands/init.h"
 #include "commands/run.h"
+#include "commands/install.h"
 
 int main(int argc, char* argv[]) {
     if (argc == 0) {
@@ -10,25 +11,48 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::string comand = argv[1];
+    std::string command = argv[1];
 
-    if (comand == "init"){
+    if (command == "init"){
         if (argc > 2) {
             std::cout << "pmp: Too many arguments for 'init' command.\n";
             return 1;
         }
         init();
+        return 0;
     }
 
-    if (comand == "run") {
+    if (command == "run") {
         if (argc == 3){
             run(argv[2]);
             return 0;
         }
-        char* defaultArg = "default";
+        char* defaultArg = "*";
         run(defaultArg); // Default argument if none is provided
+        return 0;
     }
 
+    if (command == "install") {
+        if (argc == 3) {
+            std::string package = argv[2];
+            install(package);
+            return 0;
+        }
+        else if (argc == 2) {
+            std::string package = "*"; // Default package if none is provided
+            install(package); // Default package if none is provided   
+            return 0;
+        }
+        return 1;
+    }
 
-    return 0;
+    if (command == "--version" || command == "-v") {
+        std::cout << "pmp version 0.1\n";
+        return 0;
+    }
+
+    std::cout << "pmp: Unknown command '" << command << "'.\n";
+    std::cout << "Use 'pmp help' for more information.\n";
+
+    return 1;
 }

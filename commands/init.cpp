@@ -77,4 +77,22 @@ void init(){
     } else {
         std::cout << "pmp: Failed to create .gitignore file.\n";
     }
+
+    // Create a lock file for the project
+    std::ofstream lockFile("pmp_lock.json");
+
+    std::ifstream pmpLockFile("/usr/local/share/pmp/templates/template_pmp_lock.json");
+
+    if (lockFile.is_open() && pmpLockFile.is_open()) {
+        std::string line;
+        while (std::getline(pmpLockFile, line)) {
+            lockFile << line << "\n";
+        }
+        lockFile.close();
+        pmpLockFile.close();
+        std::cout << "pmp: Lock file created successfully.\n";
+    } else {
+        std::cout << "pmp: Failed to create lock file.\n";
+    }
+
 }
