@@ -1,5 +1,5 @@
 build:
-	g++ -o pmp main.cpp commands/init.cpp commands/run.cpp commands/install.cpp
+	g++ -o pmp main.cpp commands/init.cpp commands/run.cpp commands/install.cpp commands/uninstall.cpp
 
 install:
 	sudo cp pmp /usr/local/bin/
@@ -7,3 +7,5 @@ install:
 	sudo mkdir -p /usr/local/share/pmp/
 	sudo cp -r templates /usr/local/share/pmp/
 	sudo chmod -R 755 /usr/local/share/pmp/templates
+
+build-install: build install

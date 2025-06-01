@@ -3,6 +3,7 @@
 #include "commands/init.h"
 #include "commands/run.h"
 #include "commands/install.h"
+#include "commands/uninstall.h"
 
 int main(int argc, char* argv[]) {
     if (argc == 0) {
@@ -46,8 +47,18 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if (command == "uninstall") {
+        if (argc == 3) {
+            std::string package = argv[2];
+            uninstall(package);
+            return 0;
+        }
+        std::cout << "pmp: You must specify a package to uninstall.\n";
+        return 1;
+    }
+
     if (command == "--version" || command == "-v") {
-        std::cout << "pmp version 0.1\n";
+        std::cout << "pmp version 0.2\n";
         return 0;
     }
 
