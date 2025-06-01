@@ -1,0 +1,10 @@
+{
+  "project_name": "",
+  "tasks": [],
+  "description": "This is a configuration file for the PMP project management tool.",
+  "version": "1.0",
+  "functions": {
+    "*": "python run.py"
+  },
+  "dependencies": []
+}
