@@ -12,133 +12,258 @@
 using json = nlohmann::json;
 using namespace std;
 
-string get_installed_version(const string& package) {
+string get_installed_version(const string &package)
+{
     string cmd = "bash -c 'source pmp_venv/bin/activate && pip show " + package + " | grep ^Version:'";
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (!pipe) return "";
+    FILE *pipe = popen(cmd.c_str(), "r");
+    if (!pipe)
+        return "";
 
     char buffer[128];
     string result = "";
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr)
+    {
         result += buffer;
     }
     pclose(pipe);
 
     size_t pos = result.find("Version: ");
-    if (pos != string::npos) {
-        return result.substr(pos + 9);  // 9 = length of "Version: "
+    if (pos != string::npos)
+    {
+        string version = result.substr(pos + 9);
+        // Remove newline if exists
+        if (!version.empty() && (version.back() == '\n' || version.back() == '\r'))
+            version.pop_back();
+        return version;
     }
 
     return "";
 }
 
-void install(string package) {
-    cout << "pmp: Installing PMP dependencies...: " << package << endl;
+string get_base_package(const string& pkg)
+{
+    // Find the first occurrence of '[', '=', or '=='
+    size_t pos = pkg.find_first_of("[=");
+    if (pos == string::npos)
+        return pkg;
 
-    ifstream pmp_config("./pmp_config.json");
-    if (!pmp_config.is_open()) {
+    // For "==", we need to check it's not a single '=', since find_first_of may return '=' which is part of '=='
+    if (pos > 0 && pkg[pos] == '=' && pos + 1 < pkg.size() && pkg[pos + 1] == '=')
+        return pkg.substr(0, pos);
+
+    return pkg.substr(0, pos);
+}
+
+void install(string package)
+{
+    cout << "pmp: Installing PMP dependency: " << package << endl;
+
+    ifstream config_in("./pmp_config.json");
+    if (!config_in.is_open())
+    {
         cout << "pmp: pmp_config.json file not found.\n";
         return;
     }
-
-    ifstream pmp_lock("./pmp_lock.json");
-    if (!pmp_lock.is_open()) {
-        cout << "pmp: pmp_lock.json file not found. Creating a new one...\n";
-        ofstream pmp_lock_out("./pmp_lock.json");
-        if (pmp_lock_out.is_open()) {
-            pmp_lock_out << "[]";
-            pmp_lock_out.close();
-            cout << "pmp: pmp_lock.json file created successfully.\n";
-        } else {
-            cout << "pmp: Failed to create pmp_lock.json file.\n";
-            return;
-        }
-        pmp_lock.open("./pmp_lock.json");
-    }
-
-    ifstream venv_check("./pmp_venv/bin/activate");
-    if (!venv_check.is_open()) {
-        cout << "pmp: pmp_venv directory not found. making.\n";
-        int result = system("python3 -m venv pmp_venv");
-        if (result != 0) {
-            cout << "pmp: Failed to create virtual environment 'pmp_venv'.\n";
-            return;
-        }
-    }
-
     json config;
-    pmp_config >> config;
+    config_in >> config;
+
+    ifstream lock_in("./pmp_lock.json");
+    if (!lock_in.is_open())
+    {
+        ofstream lock_create("./pmp_lock.json");
+        lock_create << "[]";
+        lock_create.close();
+        lock_in.open("./pmp_lock.json");
+    }
     json lock;
-    pmp_lock >> lock;
+    lock_in >> lock;
 
-    auto save_json = [](const string& path, const json& jdata) {
-        ofstream out(path);
-        if (out.is_open()) {
-            out << jdata.dump(4);
-            out.close();
-            return true;
-        }
-        return false;
-    };
+    // Create virtual environment if it does not exist
+    ifstream venv_check("./pmp_venv/bin/activate");
+    if (!venv_check.is_open())
+    {
+        cout << "pmp: Creating virtual environment.\n";
+        system("python3 -m venv pmp_venv");
+    }
 
-    auto package_installed = [&](const string& fullpkg) {
-        return any_of(lock.begin(), lock.end(), [&](const string& item) {
-            return item == fullpkg;
-        });
-    };
-
-    if (package != "*") {
-        // Install package
-        cout << "pmp: Installing package '" << package << "'...\n";
-        string pip_cmd = "bash -c 'source pmp_venv/bin/activate && pip install " + package + "'";
-        if (system(pip_cmd.c_str()) != 0) {
-            cout << "pmp: Failed to install package '" << package << "'.\n";
+    if (package == "*")
+    {
+        if (!config.contains("dependencies") || !config["dependencies"].is_array())
+        {
+            cout << "pmp: Invalid or missing 'dependencies' in pmp_config.json.\n";
             return;
         }
 
-        string version = get_installed_version(package);
-        version.erase(remove(version.begin(), version.end(), '\n'), version.end());
-        if (version.empty()) {
-            cout << "pmp: Failed to determine installed version of '" << package << "'.\n";
-            return;
+        for (const auto &dep_entry : config["dependencies"])
+        {
+            if (!dep_entry.is_string())
+            {
+                cout << "pmp: Invalid dependency entry: " << dep_entry.dump() << "\n";
+                continue;
+            }
+
+            string dep = dep_entry.get<string>();
+            string base_package = get_base_package(dep);
+
+            // Check if already in lock (with any version)
+            bool already_installed = false;
+            for (const auto &locked_dep : lock)
+            {
+                if (locked_dep.is_string())
+                {
+                    string locked_str = locked_dep.get<string>();
+                    if (locked_str.rfind(base_package + "==", 0) == 0)
+                    {
+                        already_installed = true;
+                        break;
+                    }
+                }
+            }
+            if (already_installed)
+            {
+                cout << "pmp: Package '" << base_package << "' is already installed.\n";
+                continue;
+            }
+
+            // Install package with pip
+            cout << "pmp: Installing package '" << dep << "'...\n";
+            string install_cmd = "bash -c 'source pmp_venv/bin/activate && pip install \"" + dep + "\"'";
+            int result = system(install_cmd.c_str());
+            if (result != 0)
+            {
+                cout << "pmp: Failed to install '" << dep << "'. Skipping.\n";
+                continue;
+            }
+
+            // Get installed version
+            string version = get_installed_version(base_package);
+            if (version.empty())
+            {
+                cout << "pmp: Failed to detect installed version for " << base_package << ". Skipping.\n";
+                continue;
+            }
+
+            string pinned = base_package + "==" + version;
+
+            // Add to lock if not already present (for safety)
+            auto it_lock = std::find_if(lock.begin(), lock.end(), [&](const json& j){
+                if (!j.is_string()) return false;
+                return j.get<string>().rfind(base_package + "==", 0) == 0;
+            });
+            if (it_lock == lock.end())
+                lock.push_back(pinned);
+
+            // Update or add in config dependencies
+            auto &deps = config["dependencies"];
+            bool updated = false;
+            for (auto& d : deps)
+            {
+                if (!d.is_string()) continue;
+                string dstr = d.get<string>();
+                string dbase = get_base_package(dstr);
+                if (dbase == base_package)
+                {
+                    d = pinned;
+                    updated = true;
+                    break;
+                }
+            }
+            if (!updated)
+                deps.push_back(pinned);
+
+            cout << "pmp: Installed and pinned " << pinned << "\n";
         }
 
-        string fullpkg = package + "==" + version;
-
-        if (!package_installed(fullpkg)) {
-            lock.push_back(fullpkg);
-            save_json("./pmp_lock.json", lock);
-            cout << "pmp: Updated pmp_lock.json with '" << fullpkg << "'.\n";
+        // Save updated lock and config
+        ofstream lock_out("./pmp_lock.json");
+        if (lock_out.is_open())
+        {
+            lock_out << lock.dump(4);
+            lock_out.close();
+            cout << "pmp: Updated pmp_lock.json.\n";
+        }
+        else
+        {
+            cout << "pmp: Failed to write pmp_lock.json.\n";
         }
 
-        if (config.contains("dependencies") && config["dependencies"].is_array()) {
-            config["dependencies"].push_back(fullpkg);
-            save_json("./pmp_config.json", config);
-            cout << "pmp: Updated pmp_config.json with '" << fullpkg << "'.\n";
+        ofstream config_out("./pmp_config.json");
+        if (config_out.is_open())
+        {
+            config_out << config.dump(4);
+            config_out.close();
+            cout << "pmp: Updated pmp_config.json.\n";
+        }
+        else
+        {
+            cout << "pmp: Failed to write pmp_config.json.\n";
         }
 
         return;
     }
 
-    // "*" case: install all from pmp_config
-    if (config.contains("dependencies") && config["dependencies"].is_array()) {
-        for (const auto& dep : config["dependencies"]) {
-            if (!dep.is_string()) continue;
-            string depstr = dep.get<string>();
-            if (package_installed(depstr)) {
-                cout << "pmp: Package '" << depstr << "' already installed.\n";
-                continue;
-            }
+    // Single package installation case
+    string base_package = get_base_package(package);
 
-            string pip_cmd = "bash -c 'source pmp_venv/bin/activate && pip install " + depstr + "'";
-            cout << "pmp: Installing '" << depstr << "'...\n";
-            if (system(pip_cmd.c_str()) == 0) {
-                lock.push_back(depstr);
-                cout << "pmp: Installed '" << depstr << "'.\n";
-            } else {
-                cout << "pmp: Failed to install '" << depstr << "'.\n";
-            }
+    // Check if already installed (in lock)
+    for (const auto &dep : lock)
+    {
+        if (dep.is_string() && dep.get<string>().rfind(base_package + "==", 0) == 0)
+        {
+            cout << "pmp: Package '" << base_package << "' is already installed.\n";
+            return;
         }
-        save_json("./pmp_lock.json", lock);
     }
+
+    // Install package with pip
+    string install_cmd = "bash -c 'source pmp_venv/bin/activate && pip install \"" + package + "\"'";
+    int result = system(install_cmd.c_str());
+    if (result != 0)
+    {
+        cout << "pmp: Failed to install '" << package << "'.\n";
+        return;
+    }
+
+    // Get installed version
+    string version = get_installed_version(base_package);
+    if (version.empty())
+    {
+        cout << "pmp: Failed to detect installed version.\n";
+        return;
+    }
+
+    string pinned = base_package + "==" + version;
+
+    // Add to lock and config dependencies
+    lock.push_back(pinned);
+    if (!config.contains("dependencies") || !config["dependencies"].is_array())
+    {
+        config["dependencies"] = json::array();
+    }
+    config["dependencies"].push_back(pinned);
+
+    // Save lock and config
+    ofstream lock_out("./pmp_lock.json");
+    if (lock_out.is_open())
+    {
+        lock_out << lock.dump(4);
+        lock_out.close();
+    }
+    else
+    {
+        cout << "pmp: Failed to write pmp_lock.json.\n";
+    }
+
+    ofstream config_out("./pmp_config.json");
+    if (config_out.is_open())
+    {
+        config_out << config.dump(4);
+        config_out.close();
+    }
+    else
+    {
+        cout << "pmp: Failed to write pmp_config.json.\n";
+    }
+
+    cout << "pmp: Package '" << pinned << "' installed and recorded.\n";
 }

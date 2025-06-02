@@ -1,5 +1,12 @@
 {
     "files.associations": {
-        "string": "cpp"
+        "*.html": "html",
+        "string": "cpp",
+        "fstream": "cpp",
+        "array": "cpp",
+        "cstdlib": "cpp",
+        "cstdio": "cpp",
+        "sstream": "cpp",
+        "algorithm": "cpp"
     }
 }
