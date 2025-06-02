@@ -12,80 +12,61 @@ using namespace std;
 void uninstall(string package) {
     cout << "pmp: Uninstalling PMP dependency: " << package << endl;
 
-    // Load lock file
-    ifstream pmp_lock("./pmp_lock.json");
-    if (!pmp_lock.is_open()) {
-        cout << "pmp: pmp_lock.json file not found.\n";
+    ifstream lock_in("./pmp_lock.json");
+    ifstream config_in("./pmp_config.json");
+    if (!lock_in.is_open() || !config_in.is_open()) {
+        cout << "pmp: Required files not found.\n";
         return;
     }
-    json lock;
-    pmp_lock >> lock;
 
-    // Load config file
-    ifstream pmp_config("./pmp_config.json");
-    if (!pmp_config.is_open()) {
-        cout << "pmp: pmp_config.json file not found.\n";
-        return;
-    }
-    json config;
-    pmp_config >> config;
+    json lock, config;
+    lock_in >> lock;
+    config_in >> config;
 
-    // Helper to save JSON
-    auto save_json = [](const string& path, const json& jdata) {
-        ofstream out(path);
-        if (out.is_open()) {
-            out << jdata.dump(4);
-            out.close();
-            return true;
-        }
-        return false;
+    auto match_pkg = [&](const string& entry) {
+        return entry.rfind(package + "==", 0) == 0;
     };
 
-    // Find and uninstall matching entries in lock
-    bool found = false;
-    if (lock.is_array()) {
-        auto it = lock.begin();
-        while (it != lock.end()) {
-            if (it->is_string() && it->get<string>().rfind(package + "==", 0) == 0) {
-                string fullpkg = it->get<string>();
-                string cmd = "bash -c 'source pmp_venv/bin/activate && pip uninstall -y " + package + "'";
-                int result = system(cmd.c_str());
-                if (result == 0) {
-                    cout << "pmp: Uninstalled " << fullpkg << " from virtual environment.\n";
-                } else {
-                    cout << "pmp: Failed to uninstall " << fullpkg << ".\n";
-                }
-                it = lock.erase(it);
-                found = true;
-            } else {
-                ++it;
-            }
-        }
-    }
+    bool removed = false;
 
-    if (!found) {
-        cout << "pmp: Package '" << package << "' not found in lock.\n";
-    } else if (save_json("./pmp_lock.json", lock)) {
-        cout << "pmp: Updated pmp_lock.json.\n";
-    } else {
-        cout << "pmp: Failed to update pmp_lock.json.\n";
-    }
-
-    // Remove from pmp_config.json
-    if (config.contains("dependencies") && config["dependencies"].is_array()) {
-        auto& deps = config["dependencies"];
-        auto it = deps.begin();
-        while (it != deps.end()) {
-            if (it->is_string() && it->get<string>().rfind(package + "==", 0) == 0) {
-                it = deps.erase(it);
-            } else {
-                ++it;
-            }
-        }
-        if (save_json("./pmp_config.json", config)) {
-            cout << "pmp: Updated pmp_config.json.\n";
+    // Search in lock
+    auto lock_it = lock.begin();
+    while (lock_it != lock.end()) {
+        if (lock_it->is_string() && match_pkg(lock_it->get<string>())) {
+            string full = lock_it->get<string>();
+            string uninstall_cmd = "bash -c 'source pmp_venv/bin/activate && pip uninstall -y " + package + "'";
+            system(uninstall_cmd.c_str());
+            lock_it = lock.erase(lock_it);
+            removed = true;
         } else {
-            cout << "pmp: Failed to update pmp_config.json.\n";
+            ++lock_it;
         }
+    }
+
+    // Search in config
+    if (config.contains("dependencies")) {
+        auto& deps = config["dependencies"];
+        auto dep_it = deps.begin();
+        while (dep_it != deps.end()) {
+            if (dep_it->is_string() && match_pkg(dep_it->get<string>())) {
+                dep_it = deps.erase(dep_it);
+            } else {
+                ++dep_it;
+            }
+        }
+    }
+
+    if (removed) {
+        ofstream lock_out("./pmp_lock.json");
+        lock_out << lock.dump(4);
+        lock_out.close();
+
+        ofstream config_out("./pmp_config.json");
+        config_out << config.dump(4);
+        config_out.close();
+
+        cout << "pmp: Uninstalled and cleaned up '" << package << "'.\n";
+    } else {
+        cout << "pmp: Package '" << package << "' not found in lock.\n";
     }
 }
