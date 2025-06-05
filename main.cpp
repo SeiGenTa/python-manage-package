@@ -57,8 +57,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if (command == "clear"){
+        // delete the pmp_lock.json file
+        std::remove("pmp_lock.json");
+        std::cout << "pmp: Lock file cleared.\n";
+
+        // and delete the folfer pmp_venv
+        std::system("rm -rf pmp_venv");
+    }
+
     if (command == "--version" || command == "-v") {
-        std::cout << "pmp version 0.2\n";
+        std::cout << "pmp version 0.3.0\n";
         return 0;
     }
 

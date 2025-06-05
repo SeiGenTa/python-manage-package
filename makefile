@@ -1,5 +1,5 @@
 build:
-	g++ -o pmp main.cpp commands/init.cpp commands/run.cpp commands/install.cpp commands/uninstall.cpp
+	g++ -o pmp main.cpp commands/init.cpp commands/run.cpp commands/install.cpp commands/uninstall.cpp commands/utils.cpp
 
 install:
 	sudo cp pmp /usr/local/bin/

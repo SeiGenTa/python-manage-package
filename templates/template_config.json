@@ -6,5 +6,6 @@
   "functions": {
     "*": "python main.py"
   },
-  "dependencies": []
+  "dependencies": {},
+  "dependencies_secundary": {}
 }
