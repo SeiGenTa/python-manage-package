@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <sstream>
+#include <set>
 #include <algorithm>
 #include "utils.h"
 
@@ -14,49 +15,80 @@ using json = nlohmann::json;
 using ordered_json = nlohmann::ordered_json;
 using namespace std;
 
+/**
+ * Recursively retrieves all unique dependencies of a package in a flat JSON structure.
+ *
+ * Each dependency is listed only once, and the returned JSON maps each dependency name
+ * to an object containing its installed version.
+ *
+ * @param package The root package to analyze.
+ * @return A flat JSON object like: { "dep_name": { "version": "x.y.z" }, ... }
+ */
 json get_dependence_of_package(const string &package)
 {
-    // This function should return the dependencies of the package
-    // For now, we will return an empty json object
-    // In a real implementation, this would query the package manager or a database
+    // To avoid processing the same package multiple times
+    set<string> visited;
 
-    json dependencies;
-    string cmd = "bash -c 'source pmp_venv/bin/activate && pip show " + package + " | grep Requires:'";
-    FILE *pipe = popen(cmd.c_str(), "r");
-    if (!pipe)
+    // Final JSON object to store dependencies and their versions
+    json all_dependencies;
+
+    // Recursive lambda function to resolve and add dependencies
+    function<void(const string &)> resolve_dependencies = [&](const string &pkg)
     {
-        cout << "pmp: Error getting dependencies for package: " << package << endl;
-        return dependencies;
-    }
-    char buffer[128];
-    string result = "";
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr)
-    {
-        result += buffer;
-    }
-    pclose(pipe);
-    // Remove the "Requires: " part
-    size_t pos = result.find("Requires: ");
-    if (pos != string::npos)
-    {
-        result = result.substr(pos + 10); // 10 is the length of "Requires: "
-        // Split by comma and trim spaces
-        stringstream ss(result);
-        string item;
-        while (getline(ss, item, ','))
+        if (visited.count(pkg))
+            return; // Already processed
+
+        visited.insert(pkg);
+
+        // Build command to extract dependencies using pip
+        string cmd = "bash -c 'source pmp_venv/bin/activate && pip show " + pkg + " | grep Requires:'";
+        FILE *pipe = popen(cmd.c_str(), "r");
+        if (!pipe)
         {
-            item.erase(remove_if(item.begin(), item.end(), ::isspace), item.end()); // Trim spaces
-            if (!item.empty())
+            cerr << "pmp: Error getting dependencies for package: " << pkg << endl;
+            return;
+        }
+
+        char buffer[128];
+        string result;
+        while (fgets(buffer, sizeof(buffer), pipe) != nullptr)
+        {
+            result += buffer;
+        }
+        pclose(pipe);
+
+        // Parse line starting with "Requires: "
+        size_t pos = result.find("Requires: ");
+        if (pos != string::npos)
+        {
+            result = result.substr(pos + 10); // Strip the prefix
+            stringstream ss(result);
+            string item;
+            while (getline(ss, item, ','))
             {
-                dependencies[item] = {
-                    {"version", get_installed_version(item)},
-                    {"required_by", package} // Optional: you can add the package that requires this dependency
-                };
+                // Trim spaces
+                item.erase(remove_if(item.begin(), item.end(), ::isspace), item.end());
+
+                if (!item.empty() && !visited.count(item))
+                {
+                    // Add dependency with version
+                    all_dependencies[item] = {
+                        {"version", get_installed_version(item)}
+                    };
+
+                    // Recursively resolve dependencies of this dependency
+                    resolve_dependencies(item);
+                }
             }
         }
-        return dependencies;
-    }
+    };
+
+    // Start from the root package (but do not include it in the result)
+    resolve_dependencies(package);
+
+    return all_dependencies;
 }
+
 
 string get_installed_version(const string &package)
 {
@@ -252,93 +284,21 @@ void install_new_dependencies(string &package)
         const string &dep_name = it.key();
         const json &dep_info = it.value();
 
-        if (pmp_config["dependencies_secundary"].contains(dep_name))
-        {
-            // If the dependency already exists, we update the version
-            pmp_config["dependencies_secundary"][dep_name]["version"] = dep_info["version"];
-            // and add the base package to the required_by list
-            if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
-            {
-                pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
-            }
-            // Check if the base package is already in the required_by list
-            auto &required_by = pmp_config["dependencies_secundary"][dep_name]["required_by"];
-            if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
-            {
-                // If not, we add it
-                required_by.push_back(base_package);
-            }
-        }
-        else
-        {
-            // If it does not exist, we add it
+        if (!pmp_config["dependencies_secundary"].contains(dep_name)){
             pmp_config["dependencies_secundary"][dep_name] = {
                 {"version", dep_info["version"]},
-                {"required_by", {base_package}}};
+                {"required_by", json::array()}};
         }
-    }
-    // add the base package to the dependencies_secundary list and this have how required_by the base package
-    if (!pmp_config["dependencies_secundary"].contains(base_package))
-    {
-        pmp_config["dependencies_secundary"][base_package] = {
-            {"version", version_installed},
-            {"required_by", {base_package}}};
-    }
-    else
-    {
-        // If the base package already exists, we update the version
-        pmp_config["dependencies_secundary"][base_package]["version"] = version_installed;
-        // and add the base package to the required_by list
-        auto &required_by = pmp_config["dependencies_secundary"][base_package]["required_by"];
-        if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
+
+        if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
         {
-            required_by.push_back(base_package);
+            pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
         }
+
+        auto &required_by_list = pmp_config["dependencies_secundary"][dep_name]["required_by"];
+
+        required_by_list.push_back(base_package);
     }
-
-    string freeze_cmd = "bash -c 'source pmp_venv/bin/activate && pip freeze'";
-    FILE *pipe = popen(freeze_cmd.c_str(), "r");
-    if (!pipe)
-    {
-        cout << "pmp: Error ejecutando pip freeze" << endl;
-        return;
-    }
-    char buffer[256];
-    string line;
-    while (fgets(buffer, sizeof(buffer), pipe))
-    {
-        string dep_line(buffer);
-        dep_line.erase(remove(dep_line.begin(), dep_line.end(), '\n'), dep_line.end());
-        dep_line.erase(remove(dep_line.begin(), dep_line.end(), '\r'), dep_line.end());
-        if (dep_line.empty())
-            continue;
-
-        auto dep_name = get_base_package(dep_line);
-        auto dep_version = get_version(dep_line);
-
-        // No agregar el paquete base a dependencies_secundary aquí, lo agregamos más abajo
-        if (dep_name == base_package)
-            continue;
-
-        // Actualizar dependencies_secundary con esta dependencia
-        if (pmp_config["dependencies_secundary"].contains(dep_name))
-        {
-            pmp_config["dependencies_secundary"][dep_name]["version"] = dep_version;
-            if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
-                pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
-
-            auto &required_by = pmp_config["dependencies_secundary"][dep_name]["required_by"];
-            if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
-                required_by.push_back(base_package);
-        }
-        else
-        {
-            pmp_config["dependencies_secundary"][dep_name] = {
-                {"version", dep_version},
-                {"required_by", {base_package}}};
-        }
-    }
-    pclose(pipe);
 
     // Ya al final agregamos el paquete base a dependencies_secundary también
     if (!pmp_config["dependencies_secundary"].contains(base_package))
