@@ -112,62 +112,47 @@ void uninstall_unused_dependencies()
 
     if (!pmp_config["dependencies_secundary"].is_object())
     {
+        cout << "pmp: No secondary dependencies found in pmp_config.json.\n";
         return;
     }
 
     string command = "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ";
 
-    // Iterate through the secondary dependencies
-    for (auto it = pmp_config["dependencies_secundary"].begin(); it != pmp_config["dependencies_secundary"].end();)
-    {
-        // Check if the package is used by any other package
-        bool is_used = false;
-        for (const auto &other_dep : pmp_config["dependencies_secundary"].items())
-        {
-            if (other_dep.key() == it.key())
-                continue;
+    ordered_json &dep_sec = pmp_config["dependencies_secundary"];
 
-            if (other_dep.value().contains("required_by"))
+    for (auto it = dep_sec.begin(); it != dep_sec.end();)
+    {
+        if (it.value().contains("required_by") && it.value()["required_by"].is_array())
+        {
+            // If the package is required by any other package, skip it
+            if (!it.value()["required_by"].empty())
             {
-                for (const auto &depender : other_dep.value()["required_by"])
-                {
-                    if (depender == it.key())
-                    {
-                        is_used = true;
-                        break;
-                    }
-                }
+                ++it;
+                continue;
             }
 
-            if (is_used)
-                break;
-        }
-
-        // If not used, remove it
-        if (!is_used)
-        {
-            command = command + it.key() + " ";
-            it = pmp_config["dependencies_secundary"].erase(it);
-        }
-        else
-        {
-            ++it;
+            command += it.key() + " ";
+            dep_sec.erase(it);
         }
     }
 
-    // If there are packages to uninstall, execute the command
-    if (command != "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ")
+    // If there are no packages to uninstall, return
+    if (command == "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ")
     {
-        command += "'";
-        int result = std::system(command.c_str());
-        if (result != 0)
-        {
-            return;
-        }
+        return;
+    }
+
+    command += "'";
+
+    int result = std::system(command.c_str());
+
+    if (result != 0)
+    {
+        cout << "pmp: Error uninstalling unused dependencies.\n";
+        return;
     }
 
     // Save the updated config to pmp_config.json
-
     ofstream config_out("./pmp_config.json");
     if (!config_out.is_open())
     {
@@ -176,4 +161,66 @@ void uninstall_unused_dependencies()
     }
     config_out << pmp_config.dump(4);
     config_out.close();
+
+    // string command = "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ";
+    //
+    //// Iterate through the secondary dependencies
+    // for (auto it = pmp_config["dependencies_secundary"].begin(); it != pmp_config["dependencies_secundary"].end();)
+    //{
+    //     // Check if the package is used by any other package
+    //     bool is_used = false;
+    //     for (const auto &other_dep : pmp_config["dependencies_secundary"].items())
+    //     {
+    //         if (other_dep.key() == it.key())
+    //             continue;
+    //
+    //        if (other_dep.value().contains("required_by"))
+    //        {
+    //            for (const auto &depender : other_dep.value()["required_by"])
+    //            {
+    //                if (depender == it.key())
+    //                {
+    //                    is_used = true;
+    //                    break;
+    //                }
+    //            }
+    //        }
+    //
+    //        if (is_used)
+    //            break;
+    //    }
+    //
+    //    // If not used, remove it
+    //    if (!is_used)
+    //    {
+    //        command = command + it.key() + " ";
+    //        it = pmp_config["dependencies_secundary"].erase(it);
+    //    }
+    //    else
+    //    {
+    //        ++it;
+    //    }
+    //}
+    //
+    //// If there are packages to uninstall, execute the command
+    // if (command != "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ")
+    //{
+    //     command += "'";
+    //     int result = std::system(command.c_str());
+    //     if (result != 0)
+    //     {
+    //         return;
+    //     }
+    // }
+    //
+    //// Save the updated config to pmp_config.json
+    //
+    // ofstream config_out("./pmp_config.json");
+    // if (!config_out.is_open())
+    //{
+    //    cout << "pmp: Error saving pmp_config.json file.\n";
+    //    return;
+    //}
+    // config_out << pmp_config.dump(4);
+    // config_out.close();
 }

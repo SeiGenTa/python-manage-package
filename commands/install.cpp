@@ -252,93 +252,54 @@ void install_new_dependencies(string &package)
         const string &dep_name = it.key();
         const json &dep_info = it.value();
 
-        if (pmp_config["dependencies_secundary"].contains(dep_name))
-        {
-            // If the dependency already exists, we update the version
-            pmp_config["dependencies_secundary"][dep_name]["version"] = dep_info["version"];
-            // and add the base package to the required_by list
-            if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
-            {
-                pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
-            }
-            // Check if the base package is already in the required_by list
-            auto &required_by = pmp_config["dependencies_secundary"][dep_name]["required_by"];
-            if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
-            {
-                // If not, we add it
-                required_by.push_back(base_package);
-            }
-        }
-        else
-        {
-            // If it does not exist, we add it
+        if (!pmp_config["dependencies_secundary"].contains(dep_name)){
             pmp_config["dependencies_secundary"][dep_name] = {
                 {"version", dep_info["version"]},
-                {"required_by", {base_package}}};
+                {"required_by", json::array()}};
         }
-    }
-    // add the base package to the dependencies_secundary list and this have how required_by the base package
-    if (!pmp_config["dependencies_secundary"].contains(base_package))
-    {
-        pmp_config["dependencies_secundary"][base_package] = {
-            {"version", version_installed},
-            {"required_by", {base_package}}};
-    }
-    else
-    {
-        // If the base package already exists, we update the version
-        pmp_config["dependencies_secundary"][base_package]["version"] = version_installed;
-        // and add the base package to the required_by list
-        auto &required_by = pmp_config["dependencies_secundary"][base_package]["required_by"];
-        if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
+
+        if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
         {
-            required_by.push_back(base_package);
+            pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
         }
-    }
 
-    string freeze_cmd = "bash -c 'source pmp_venv/bin/activate && pip freeze'";
-    FILE *pipe = popen(freeze_cmd.c_str(), "r");
-    if (!pipe)
-    {
-        cout << "pmp: Error ejecutando pip freeze" << endl;
-        return;
-    }
-    char buffer[256];
-    string line;
-    while (fgets(buffer, sizeof(buffer), pipe))
-    {
-        string dep_line(buffer);
-        dep_line.erase(remove(dep_line.begin(), dep_line.end(), '\n'), dep_line.end());
-        dep_line.erase(remove(dep_line.begin(), dep_line.end(), '\r'), dep_line.end());
-        if (dep_line.empty())
-            continue;
-
-        auto dep_name = get_base_package(dep_line);
-        auto dep_version = get_version(dep_line);
-
-        // No agregar el paquete base a dependencies_secundary aquí, lo agregamos más abajo
-        if (dep_name == base_package)
-            continue;
-
-        // Actualizar dependencies_secundary con esta dependencia
-        if (pmp_config["dependencies_secundary"].contains(dep_name))
+        for (const auto &required_by : dep_info["required_by"])
         {
-            pmp_config["dependencies_secundary"][dep_name]["version"] = dep_version;
-            if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
-                pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
+            // Check if the base package is already in the required_by list
+            auto &required_by_list = pmp_config["dependencies_secundary"][dep_name]["required_by"];
+            if (std::find(required_by_list.begin(), required_by_list.end(), base_package) == required_by_list.end())
+            {
+                // If not, we add it
+                required_by_list.push_back(base_package);
+            }
+        }
 
-            auto &required_by = pmp_config["dependencies_secundary"][dep_name]["required_by"];
-            if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
-                required_by.push_back(base_package);
-        }
-        else
-        {
-            pmp_config["dependencies_secundary"][dep_name] = {
-                {"version", dep_version},
-                {"required_by", {base_package}}};
-        }
+
+        //if (pmp_config["dependencies_secundary"].contains(dep_name))
+        //{
+        //    // If the dependency already exists, we update the version
+        //    pmp_config["dependencies_secundary"][dep_name]["version"] = dep_info["version"];
+        //    // and add the base package to the required_by list
+        //    if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
+        //    {
+        //        pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
+        //    }
+        //    // Check if the base package is already in the required_by list
+        //    auto &required_by = pmp_config["dependencies_secundary"][dep_name]["required_by"];
+        //    if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
+        //    {
+        //        // If not, we add it
+        //        required_by.push_back(base_package);
+        //    }
+        //}
+        //else
+        //{
+        //    // If it does not exist, we add it
+        //    pmp_config["dependencies_secundary"][dep_name] = {
+        //        {"version", dep_info["version"]},
+        //        {"required_by", {base_package}}};
+        //}
     }
-    pclose(pipe);
 
     // Ya al final agregamos el paquete base a dependencies_secundary también
     if (!pmp_config["dependencies_secundary"].contains(base_package))
