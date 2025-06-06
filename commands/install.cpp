@@ -11,6 +11,7 @@
 #include "utils.h"
 
 using json = nlohmann::json;
+using ordered_json = nlohmann::ordered_json;
 using namespace std;
 
 json get_dependence_of_package(const string &package)
@@ -50,10 +51,11 @@ json get_dependence_of_package(const string &package)
                 dependencies[item] = {
                     {"version", get_installed_version(item)},
                     {"required_by", package} // Optional: you can add the package that requires this dependency
+                };
             }
         }
+        return dependencies;
     }
-    return dependencies;
 }
 
 string get_installed_version(const string &package)
@@ -110,11 +112,105 @@ string get_version(const string &pkg)
     return "";
 }
 
-void install_dependencies(const json &config, json &lock)
+void install_dependencies()
 {
+    // This function installs all dependencies listed in the pmp_config.json file in dependencies and dependencies_secundary
+    cout << "pmp: Installing all dependencies from pmp_config.json..." << endl;
+
+    ifstream config_in("./pmp_config.json");
+    if (!config_in.is_open())
+    {
+        cout << "pmp: pmp_config.json file not found.\n";
+        return;
+    }
+    json config;
+    config_in >> config;
+    config_in.close();
+
+    ifstream lock_in("./pmp_lock.json");
+    if (!lock_in.is_open())
+    {
+        cout << "pmp: pmp_lock.json file not found, creating a new one.\n";
+        ofstream lock_create("./pmp_lock.json");
+        lock_create << "[]";
+        lock_create.close();
+        lock_in.open("./pmp_lock.json");
+    }
+    json lock;
+    lock_in >> lock;
+    lock_in.close();
+
+    // Create virtual environment if it does not exist
+    ifstream venv_check("./pmp_venv/bin/activate");
+    if (!venv_check.is_open())
+    {
+        cout << "pmp: Creating virtual environment.\n";
+        system("python3 -m venv pmp_venv");
+    }
+
+    // Activate the virtual environment
+    for (const auto &entry : config["dependencies"].items())
+    {
+        const string &package = entry.key();
+        const string &version = entry.value()["version"];
+        cout << "pmp: Installing package: " << package << " version: " << version << endl;
+
+        string command = "bash -c 'source pmp_venv/bin/activate && pip install " + package;
+        if (!version.empty())
+        {
+            command += "==" + version;
+        }
+        command += "'";
+
+        int resultado = std::system(command.c_str());
+
+        if (resultado != 0)
+        {
+            cout << "pmp: Error installing package: " << package << endl;
+            continue;
+        }
+
+        // Add to lock file
+        string version_installed = get_installed_version(package);
+        if (!version_installed.empty())
+        {
+            lock.push_back(package + "==" + version_installed);
+            cout << "pmp: Package installed and added to pmp_lock.json: " << package << endl;
+        }
+    }
+
+    // Now we install the secondary dependencies
+    for (const auto &entry : config["dependencies_secundary"].items())
+    {
+        const string &package = entry.key();
+        const string &version = entry.value()["version"];
+        cout << "pmp: Installing secondary package: " << package << " version: " << version << endl;
+        string command = "bash -c 'source pmp_venv/bin/activate && pip install " + package;
+        if (!version.empty())
+        {
+            command += "==" + version;
+        }
+        command += "'";
+        int resultado = std::system(command.c_str());
+        if (resultado != 0)
+        {
+            cout << "pmp: Error installing secondary package: " << package << endl;
+            continue;
+        }
+    }
+
+    // Save the updated lock file
+    ofstream lock_out("./pmp_lock.json");
+    if (!lock_out.is_open())
+    {
+        cout << "pmp: Error saving pmp_lock.json file.\n";
+        return;
+    }
+    lock_out << lock.dump(4);
+    lock_out.close();
 }
 
-void install_new_dependencies(json &config, json &lock, string &package)
+void install_new_dependencies(string &package)
 {
     auto base_package = get_base_package(package);
     auto version = get_version(package);
@@ -133,46 +229,186 @@ void install_new_dependencies(json &config, json &lock, string &package)
     string version_installed = get_installed_version(base_package);
     json dependencies = get_dependence_of_package(base_package);
 
-    cout << "pmp: Package " << base_package << " installed with version: " << version_installed << endl;
-    cout << "Dependencies of the package: " << dependencies.dump(4) << endl;
-    cout << endl;
+    ordered_json pmp_config;
+    ifstream config_in("./pmp_config.json");
 
-    // ✅ Verificación de tipos
-    if (!config["dependencies"].is_object())
+    config_in >> pmp_config;
+    config_in.close();
+
+    if (!pmp_config["dependencies"].is_object())
     {
-        config["dependencies"] = json::object();
+        pmp_config["dependencies"] = json::object();
     }
-    if (!config["dependencies_secundary"].is_object())
+    if (!pmp_config["dependencies_secundary"].is_object())
     {
-        config["dependencies_secundary"] = json::object();
-    }
-
-    cout << "Tipo de config[\"dependencies\"]: " << config["dependencies"].type_name() << endl;
-    cout << "Tipo de config[\"dependencies_secundary\"]: " << config["dependencies_secundary"].type_name() << endl;
-
-    // ✅ Guardar dependencia principal
-    config["dependencies"][base_package] = {
-        {"version", version_installed},
-        {"dependencies", dependencies}};
-
-    // ✅ Guardar dependencias secundarias
-    for (const auto &dep : dependencies)
-    {
-        config["dependencies_secundary"][dep] = {
-            {"version", get_installed_version(dep)},
-            {"dependencies", get_dependence_of_package(dep)}};
+        pmp_config["dependencies_secundary"] = json::object();
     }
 
-    // Guardar archivo actualizado
+    pmp_config["dependencies"][base_package] = {
+        {"version", version_installed}};
+
+    for (auto it = dependencies.begin(); it != dependencies.end(); ++it)
+    {
+        const string &dep_name = it.key();
+        const json &dep_info = it.value();
+
+        if (pmp_config["dependencies_secundary"].contains(dep_name))
+        {
+            // If the dependency already exists, we update the version
+            pmp_config["dependencies_secundary"][dep_name]["version"] = dep_info["version"];
+            // and add the base package to the required_by list
+            if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
+            {
+                pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
+            }
+            // Check if the base package is already in the required_by list
+            auto &required_by = pmp_config["dependencies_secundary"][dep_name]["required_by"];
+            if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
+            {
+                // If not, we add it
+                required_by.push_back(base_package);
+            }
+        }
+        else
+        {
+            // If it does not exist, we add it
+            pmp_config["dependencies_secundary"][dep_name] = {
+                {"version", dep_info["version"]},
+                {"required_by", {base_package}}};
+        }
+    }
+    // add the base package to the dependencies_secundary list and this have how required_by the base package
+    if (!pmp_config["dependencies_secundary"].contains(base_package))
+    {
+        pmp_config["dependencies_secundary"][base_package] = {
+            {"version", version_installed},
+            {"required_by", {base_package}}};
+    }
+    else
+    {
+        // If the base package already exists, we update the version
+        pmp_config["dependencies_secundary"][base_package]["version"] = version_installed;
+        // and add the base package to the required_by list
+        auto &required_by = pmp_config["dependencies_secundary"][base_package]["required_by"];
+        if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
+        {
+            required_by.push_back(base_package);
+        }
+    }
+
+    string freeze_cmd = "bash -c 'source pmp_venv/bin/activate && pip freeze'";
+    FILE *pipe = popen(freeze_cmd.c_str(), "r");
+    if (!pipe)
+    {
+        cout << "pmp: Error ejecutando pip freeze" << endl;
+        return;
+    }
+    char buffer[256];
+    string line;
+    while (fgets(buffer, sizeof(buffer), pipe))
+    {
+        string dep_line(buffer);
+        dep_line.erase(remove(dep_line.begin(), dep_line.end(), '\n'), dep_line.end());
+        dep_line.erase(remove(dep_line.begin(), dep_line.end(), '\r'), dep_line.end());
+        if (dep_line.empty())
+            continue;
+
+        auto dep_name = get_base_package(dep_line);
+        auto dep_version = get_version(dep_line);
+
+        // No agregar el paquete base a dependencies_secundary aquí, lo agregamos más abajo
+        if (dep_name == base_package)
+            continue;
+
+        // Actualizar dependencies_secundary con esta dependencia
+        if (pmp_config["dependencies_secundary"].contains(dep_name))
+        {
+            pmp_config["dependencies_secundary"][dep_name]["version"] = dep_version;
+            if (!pmp_config["dependencies_secundary"][dep_name]["required_by"].is_array())
+                pmp_config["dependencies_secundary"][dep_name]["required_by"] = json::array();
+
+            auto &required_by = pmp_config["dependencies_secundary"][dep_name]["required_by"];
+            if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
+                required_by.push_back(base_package);
+        }
+        else
+        {
+            pmp_config["dependencies_secundary"][dep_name] = {
+                {"version", dep_version},
+                {"required_by", {base_package}}};
+        }
+    }
+    pclose(pipe);
+
+    // Ya al final agregamos el paquete base a dependencies_secundary también
+    if (!pmp_config["dependencies_secundary"].contains(base_package))
+    {
+        pmp_config["dependencies_secundary"][base_package] = {
+            {"version", version_installed},
+            {"required_by", {base_package}}};
+    }
+    else
+    {
+        pmp_config["dependencies_secundary"][base_package]["version"] = version_installed;
+        auto &required_by = pmp_config["dependencies_secundary"][base_package]["required_by"];
+        if (!required_by.is_array())
+            required_by = json::array();
+        if (std::find(required_by.begin(), required_by.end(), base_package) == required_by.end())
+            required_by.push_back(base_package);
+    }
+
+    // Save the updated config to pmp_config.json
     ofstream config_out("./pmp_config.json");
+
     if (!config_out.is_open())
     {
         cout << "pmp: Error saving pmp_config.json file.\n";
         return;
     }
-    config_out << config.dump(4);
+
+    config_out << pmp_config.dump(4);
     config_out.close();
     cout << "pmp: pmp_config.json updated with package: " << base_package << endl;
+
+    // now we update the lock file
+    ordered_json pmp_lock;
+    ifstream lock_in("./pmp_lock.json");
+    if (lock_in.is_open())
+    {
+        lock_in >> pmp_lock;
+    }
+    else
+    {
+        cout << "pmp: pmp_lock.json file not found, creating a new one.\n";
+    }
+    lock_in.close();
+
+    // Check if the package is already in the lock file
+    bool found = false;
+    for (const auto &entry : pmp_lock)
+    {
+        if (entry.is_string() && entry.get<string>().find(base_package + "==") == 0)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found)
+    {
+        pmp_lock.push_back(base_package + "==" + version_installed);
+    }
+
+    ofstream lock_out("./pmp_lock.json");
+    if (!lock_out.is_open())
+    {
+        cout << "pmp: Error saving pmp_lock.json file.\n";
+        return;
+    }
+
+    lock_out << pmp_lock.dump(4);
+    lock_out.close();
+    cout << "pmp: pmp_lock.json updated with package: " << base_package << endl;
 }
 
 void install(string package)
@@ -209,7 +445,9 @@ void install(string package)
 
     if (package == "*")
     {
-        return install_dependencies(lock, config);
+        install_dependencies();
+        return;
     }
-    return install_new_dependencies(lock, config, package);
+    install_new_dependencies(package);
+    return;
 }
