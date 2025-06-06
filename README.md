@@ -71,8 +71,6 @@ To uninstall a package:
 pmp uninstall <package>
 ```
 
-> **Note**: Currently, this only uninstalls the specified package. Dependencies of that package are **not** removed yet.
-
 ---
 
 ## Creating Custom Commands
@@ -118,7 +116,5 @@ You would update `pmp_config.json` like this:
 
 ---
 
-## Future Goals
-
-- Automatically install the dependencies of installed packages and list them in `pmp_config.json`.
-- Automatically remove unused dependencies when a package is uninstalled.
+## Bugs:
+- in "dependencies_secondary" there can be a dependency twice.
