@@ -118,3 +118,4 @@ You would update `pmp_config.json` like this:
 
 ## Bugs:
 - in "dependencies_secondary" there can be a dependency twice.
+- the sintaxis with "[]" it doesn't work properly.(example: "fastapi[standart]")
