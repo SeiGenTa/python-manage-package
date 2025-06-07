@@ -328,7 +328,6 @@ void install_new_dependencies(string &package)
 
     config_out << pmp_config.dump(4);
     config_out.close();
-    cout << "pmp: pmp_config.json updated with package: " << base_package << endl;
 
     // now we update the lock file
     ordered_json pmp_lock;
@@ -368,7 +367,6 @@ void install_new_dependencies(string &package)
 
     lock_out << pmp_lock.dump(4);
     lock_out.close();
-    cout << "pmp: pmp_lock.json updated with package: " << base_package << endl;
 }
 
 void install(string package)
