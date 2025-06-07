@@ -73,8 +73,7 @@ json get_dependence_of_package(const string &package)
                 {
                     // Add dependency with version
                     all_dependencies[item] = {
-                        {"version", get_installed_version(item)}
-                    };
+                        {"version", get_installed_version(item)}};
 
                     // Recursively resolve dependencies of this dependency
                     resolve_dependencies(item);
@@ -88,7 +87,6 @@ json get_dependence_of_package(const string &package)
 
     return all_dependencies;
 }
-
 
 string get_installed_version(const string &package)
 {
@@ -247,6 +245,19 @@ void install_new_dependencies(string &package)
     auto base_package = get_base_package(package);
     auto version = get_version(package);
 
+    ordered_json pmp_config;
+    ifstream config_in("./pmp_config.json");
+
+    config_in >> pmp_config;
+    config_in.close();
+
+    // check if the package is already installed
+    if (pmp_config["dependencies"].contains(base_package))
+    {
+        cout << "pmp: Package " << base_package << " is already installed.\n";
+        return;
+    }
+
     cout << "pmp: Installing package: " << base_package << endl;
 
     string command = "bash -c 'source pmp_venv/bin/activate && pip install " + base_package;
@@ -260,12 +271,6 @@ void install_new_dependencies(string &package)
 
     string version_installed = get_installed_version(base_package);
     json dependencies = get_dependence_of_package(base_package);
-
-    ordered_json pmp_config;
-    ifstream config_in("./pmp_config.json");
-
-    config_in >> pmp_config;
-    config_in.close();
 
     if (!pmp_config["dependencies"].is_object())
     {
@@ -284,7 +289,8 @@ void install_new_dependencies(string &package)
         const string &dep_name = it.key();
         const json &dep_info = it.value();
 
-        if (!pmp_config["dependencies_secundary"].contains(dep_name)){
+        if (!pmp_config["dependencies_secundary"].contains(dep_name))
+        {
             pmp_config["dependencies_secundary"][dep_name] = {
                 {"version", dep_info["version"]},
                 {"required_by", json::array()}};
