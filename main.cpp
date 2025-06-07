@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
             run(argv[2]);
             return 0;
         }
-        char* defaultArg = "*";
+        char defaultArg[] = "*";
         run(defaultArg); // Default argument if none is provided
         return 0;
     }
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (command == "--version" || command == "-v") {
-        std::cout << "pmp version 0.3.2.11\n";
+        std::cout << "pmp version 0.4.0\n";
         return 0;
     }
 
