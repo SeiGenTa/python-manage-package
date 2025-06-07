@@ -5,6 +5,14 @@
 void init(){
     std::cout << "pmp: Initializing project...\n";
 
+    // Check if the current directory is a valid project directory
+    std::ifstream checkConfigFile("pmp_config.json");
+    if (checkConfigFile.is_open()) {
+        std::cout << "pmp: This directory is already a PMP project.\n";
+        checkConfigFile.close();
+        return;
+    }
+
     // Create a virtual environment for the project
     int resultado = std::system("python3 -m venv pmp_venv");
 

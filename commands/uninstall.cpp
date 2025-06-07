@@ -72,8 +72,6 @@ void uninstall(string package)
             }),
         pmp_lock.end());
 
-    cout << pmp_lock.dump(4) << endl;
-
     // save the updated pmp_config.json
     ofstream config_out("./pmp_config.json");
     if (!config_out.is_open())
@@ -161,66 +159,4 @@ void uninstall_unused_dependencies()
     }
     config_out << pmp_config.dump(4);
     config_out.close();
-
-    // string command = "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ";
-    //
-    //// Iterate through the secondary dependencies
-    // for (auto it = pmp_config["dependencies_secundary"].begin(); it != pmp_config["dependencies_secundary"].end();)
-    //{
-    //     // Check if the package is used by any other package
-    //     bool is_used = false;
-    //     for (const auto &other_dep : pmp_config["dependencies_secundary"].items())
-    //     {
-    //         if (other_dep.key() == it.key())
-    //             continue;
-    //
-    //        if (other_dep.value().contains("required_by"))
-    //        {
-    //            for (const auto &depender : other_dep.value()["required_by"])
-    //            {
-    //                if (depender == it.key())
-    //                {
-    //                    is_used = true;
-    //                    break;
-    //                }
-    //            }
-    //        }
-    //
-    //        if (is_used)
-    //            break;
-    //    }
-    //
-    //    // If not used, remove it
-    //    if (!is_used)
-    //    {
-    //        command = command + it.key() + " ";
-    //        it = pmp_config["dependencies_secundary"].erase(it);
-    //    }
-    //    else
-    //    {
-    //        ++it;
-    //    }
-    //}
-    //
-    //// If there are packages to uninstall, execute the command
-    // if (command != "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ")
-    //{
-    //     command += "'";
-    //     int result = std::system(command.c_str());
-    //     if (result != 0)
-    //     {
-    //         return;
-    //     }
-    // }
-    //
-    //// Save the updated config to pmp_config.json
-    //
-    // ofstream config_out("./pmp_config.json");
-    // if (!config_out.is_open())
-    //{
-    //    cout << "pmp: Error saving pmp_config.json file.\n";
-    //    return;
-    //}
-    // config_out << pmp_config.dump(4);
-    // config_out.close();
 }

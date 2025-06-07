@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
             run(argv[2]);
             return 0;
         }
-        char* defaultArg = "*";
+        char defaultArg[] = "*";
         run(defaultArg); // Default argument if none is provided
         return 0;
     }
@@ -60,14 +60,26 @@ int main(int argc, char* argv[]) {
     if (command == "clear"){
         // delete the pmp_lock.json file
         std::remove("pmp_lock.json");
-        std::cout << "pmp: Lock file cleared.\n";
 
         // and delete the folfer pmp_venv
         std::system("rm -rf pmp_venv");
+        return 0;
     }
 
     if (command == "--version" || command == "-v") {
-        std::cout << "pmp version 0.3.2.11\n";
+        std::cout << "pmp version 0.4.0\n";
+        return 0;
+    }
+
+    if (command == "help") {
+        std::cout << "pmp: Project Management Tool\n";
+        std::cout << "Available commands:\n";
+        std::cout << "  init\t\t\tInitialize a new project\n";
+        std::cout << "  run [arg]\t\tRun a command or script in the project environment\n";
+        std::cout << "  install [pkg]\t\tInstall a package or dependency\n";
+        std::cout << "  uninstall [pkg]\tUninstall a package or dependency\n";
+        std::cout << "  clear\t\t\tClear the lock file and virtual environment\n";
+        std::cout << "  --version, -v\t\tShow the version of pmp\n";
         return 0;
     }
 
