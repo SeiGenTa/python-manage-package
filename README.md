@@ -83,10 +83,12 @@ pmp uninstall <package>
     "tasks": [],
     "description": "This is a configuration file for the PMP project management tool.",
     "version": "1.0",
+    "env_file": ".env",
     "functions": {
         "*": "python main.py"
     },
-    "dependencies": []
+    "dependencies": {},
+    "dependencies_secundary": {}
 }
 ```
 
@@ -100,22 +102,56 @@ You would update `pmp_config.json` like this:
 
 ```json
 {
-    "dependencies": [
-        "pytest==8.3.5"
-    ],
+    "project_name": "",
+    "tasks": [],
     "description": "This is a configuration file for the PMP project management tool.",
+    "version": "1.0",
+    "env_file": ".env",
     "functions": {
         "*": "python main.py",
         "test": "pytest"
     },
+    "dependencies": {},
+    "dependencies_secundary": {}
+}
+```
+
+# environment variables
+You can set environment variables making a file with the name ".env" (you can change this changing the file pmp_config.json in the parte "env_file") this you can define your variables and if you want to use the variable, you must use the sintaxis {name_variables}
+
+## examples
+file .env
+```.env
+HOST_SERVER = 127.0.0.1
+PORT_SERVER = 7777
+```
+
+file pmp_config.json
+```json
+{
     "project_name": "",
     "tasks": [],
-    "version": "1.0"
+    "description": "This is a configuration file for the PMP project management tool.",
+    "version": "1.0",
+    "env_file": ".env",
+    "functions": {
+        "*": "uvicorn main:app --host {HOST_SERVER} --port {PORT_SERVER} --reload"
+    },
+    "dependencies": {
+        "fastapi": {
+            "version": "0.115.12"
+        },
+        "uvicorn": {
+            "version": "0.34.3"
+        }
+    },
+    "dependencies_secundary": {...}
 }
 ```
 
 ---
 
 ## Bugs:
-- in "dependencies_secondary" there can be a dependency twice.
-- the sintaxis with "[]" it doesn't work properly.(example: "fastapi[standart]")
+
+-   in "dependencies_secondary" there can be a dependency twice.
+-   the sintaxis with "[]" it doesn't work properly.(example: "fastapi[standart]")
