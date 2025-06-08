@@ -11,7 +11,7 @@ using namespace std;
 
 void uninstall(string package)
 {
-    cout << "Uninstalling package: " << package << endl;
+    cout << "pmp: Uninstalling package: " << package << endl;
 
     ordered_json pmp_config;
 
@@ -50,7 +50,7 @@ void uninstall(string package)
     pmp_config["dependencies"].erase(package);
 
     // We removed the dependency from those required
-    for (auto &[dep_name, dep_info] : pmp_config["dependencies_secundary"].items())
+    for (auto &[dep_name, dep_info] : pmp_config["dependencies_secondary"].items())
     {
         if (dep_info.contains("required_by") && dep_info["required_by"].is_array())
         {
@@ -97,7 +97,7 @@ void uninstall(string package)
 
 void uninstall_unused_dependencies()
 {
-    // Check if pmp_config.json in the dependencies_secundary section has any dependencies
+    // Check if pmp_config.json in the dependencies_secondary section has any dependencies
     // that are not used by any other package
     ordered_json pmp_config;
     ifstream config_in("./pmp_config.json");
@@ -108,7 +108,7 @@ void uninstall_unused_dependencies()
     config_in >> pmp_config;
     config_in.close();
 
-    if (!pmp_config["dependencies_secundary"].is_object())
+    if (!pmp_config["dependencies_secondary"].is_object())
     {
         cout << "pmp: No secondary dependencies found in pmp_config.json.\n";
         return;
@@ -116,7 +116,7 @@ void uninstall_unused_dependencies()
 
     string command = "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ";
 
-    ordered_json &dep_sec = pmp_config["dependencies_secundary"];
+    ordered_json &dep_sec = pmp_config["dependencies_secondary"];
 
     for (auto it = dep_sec.begin(); it != dep_sec.end();)
     {
@@ -140,7 +140,7 @@ void uninstall_unused_dependencies()
         return;
     }
 
-    command += "'";
+    command += " >/dev/null 2>&1'";
 
     int result = std::system(command.c_str());
 
@@ -149,6 +149,7 @@ void uninstall_unused_dependencies()
         cout << "pmp: Error uninstalling unused dependencies.\n";
         return;
     }
+    cout << "pmp: Unused dependencies uninstalled successfully\n";
 
     // Save the updated config to pmp_config.json
     ofstream config_out("./pmp_config.json");

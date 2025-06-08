@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (command == "--version" || command == "-v") {
-        std::cout << "pmp version 0.4.0\n";
+        std::cout << "pmp version 0.4.2\n";
         return 0;
     }
 

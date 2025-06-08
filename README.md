@@ -88,7 +88,7 @@ pmp uninstall <package>
         "*": "python main.py"
     },
     "dependencies": {},
-    "dependencies_secundary": {}
+    "dependencies_secondary": {}
 }
 ```
 
@@ -112,21 +112,25 @@ You would update `pmp_config.json` like this:
         "test": "pytest"
     },
     "dependencies": {},
-    "dependencies_secundary": {}
+    "dependencies_secondary": {}
 }
 ```
 
-# environment variables
-You can set environment variables making a file with the name ".env" (you can change this changing the file pmp_config.json in the parte "env_file") this you can define your variables and if you want to use the variable, you must use the sintaxis {name_variables}
+---
 
-## examples
-file .env
-```.env
+## Environment Variables
+
+You can set environment variables by creating a file named `.env` (you can change this by modifying the `env_file` field in `pmp_config.json`). In this file, you can define your variables. To use these variables, you must use the syntax `{variable_name}`.
+
+### Examples
+
+File: `.env`
+```
 HOST_SERVER = 127.0.0.1
 PORT_SERVER = 7777
 ```
 
-file pmp_config.json
+File: `pmp_config.json`
 ```json
 {
     "project_name": "",
@@ -145,13 +149,13 @@ file pmp_config.json
             "version": "0.34.3"
         }
     },
-    "dependencies_secundary": {...}
+    "dependencies_secondary": {...}
 }
 ```
 
 ---
 
-## Bugs:
+## Known Bugs:
 
--   in "dependencies_secondary" there can be a dependency twice.
--   the sintaxis with "[]" it doesn't work properly.(example: "fastapi[standart]")
+- In `dependencies_secondary`, there can be a dependency listed twice.
+- The syntax with square brackets `[]` doesn't work properly (example: `fastapi[standard]`).
