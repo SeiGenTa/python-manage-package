@@ -60,6 +60,7 @@
         "typeinfo": "cpp",
         "valarray": "cpp",
         "variant": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "xstring": "cpp"
     }
 }

@@ -8,6 +8,8 @@ using namespace std;
 
 using json = nlohmann::json;
 
+extern const std::string SYSTEM;
+
 // Get configuration from pmp_config.json
 json get_config();
 

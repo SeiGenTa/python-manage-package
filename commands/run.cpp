@@ -52,7 +52,12 @@ void run(char *arg)
                         }
                     }
 
-                    std::string full_command = "bash -c 'source pmp_venv/bin/activate && " + command + "'";
+                    std::string full_command;
+                    if (SYSTEM == "Windows") {
+                        full_command = "cmd /c \"pmp_venv\\Scripts\\activate && " + command + "\"";
+                    } else {
+                        full_command = "bash -c 'source pmp_venv/bin/activate && " + command + "'";
+                    }
                     std::system(full_command.c_str());
                     found = true;
                     continue;

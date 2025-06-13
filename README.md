@@ -2,6 +2,8 @@
 
 **PMP** is a tool for developers to manage Python packages easily, using commands similar to those of `npm`.
 
+*Windows Version (unfinished)*
+
 ---
 
 ## Installation

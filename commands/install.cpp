@@ -6,6 +6,11 @@
 #include <nlohmann/json.hpp>
 #include <cstdlib>
 #include <cstdio>
+#ifdef _WIN32
+#include <io.h>
+#define popen _popen
+#define pclose _pclose
+#endif
 #include <sstream>
 #include <set>
 #include <algorithm>
@@ -40,7 +45,7 @@ json get_dependence_of_package(const string &package)
     {
         // Get the base package name without extras or version constraints
         string pkg_base = get_base_package(pkg);
-        
+
         if (visited.count(pkg_base))
             return; // Already processed
 
@@ -48,6 +53,10 @@ json get_dependence_of_package(const string &package)
 
         // Build command to extract dependencies using pip
         string cmd = "bash -c 'source pmp_venv/bin/activate && pip show " + pkg_base + " | grep \"^Requires:\\|^Requires-Dist:\" 2>/dev/null'";
+        if (SYSTEM == "Windows")
+        {
+            cmd = "cmd /c \"pmp_venv\\Scripts\\activate && pip show " + pkg_base + " | findstr \"\\\"^Requires:\\|^Requires-Dist:\\\"\" 2>nul\"";
+        }
         FILE *pipe = popen(cmd.c_str(), "r");
         if (!pipe)
         {
@@ -61,7 +70,7 @@ json get_dependence_of_package(const string &package)
         {
             result += buffer;
         }
-        
+
         int exit_status = pclose(pipe);
         if (exit_status != 0)
         {
@@ -72,7 +81,7 @@ json get_dependence_of_package(const string &package)
         // Parse lines starting with "Requires: " or "Requires-Dist: " (different pip versions)
         stringstream ss(result);
         string line;
-        
+
         while (getline(ss, line))
         {
             size_t pos = line.find("Requires: ");
@@ -88,39 +97,38 @@ json get_dependence_of_package(const string &package)
             {
                 line = line.substr(pos + 10); // Strip the "Requires: " prefix
             }
-            
+
             if (pos != string::npos) // Found a requirements line
             {
                 stringstream deps_stream(line);
                 string item;
-                
+
                 while (getline(deps_stream, item, ','))
                 {
                     // Trim spaces and other whitespace
                     item = trim(item);
-                    
+
                     // Extract the base package name (without extras or version constraints)
                     string dep_base = get_base_package(item);
-                    
+
                     if (!dep_base.empty() && !visited.count(dep_base))
                     {
                         // Get the installed version
                         string version = get_installed_version(dep_base);
-                        
+
                         // Only add if the package is actually installed
                         if (!version.empty())
                         {
                             // Add dependency with version
                             all_dependencies[dep_base] = {
-                                {"version", version}
-                            };
-                            
+                                {"version", version}};
+
                             // Recursively resolve dependencies of this dependency
                             resolve_dependencies(dep_base);
                         }
                         else
                         {
-                            cerr << "pmp: Warning - Dependency " << dep_base << " is required by " 
+                            cerr << "pmp: Warning - Dependency " << dep_base << " is required by "
                                  << pkg_base << " but not installed." << endl;
                         }
                     }
@@ -137,7 +145,12 @@ json get_dependence_of_package(const string &package)
 
 string get_installed_version(const string &package)
 {
+
     string cmd = "bash -c 'source pmp_venv/bin/activate && pip show " + package + " | grep ^Version: 2>/dev/null'";
+    if (SYSTEM == "Windows")
+    {
+        cmd = "cmd /c \"pmp_venv\\Scripts\\activate && pip show " + package + " | findstr \"\\\"^Version:\\\"\" 2>nul\"";
+    }
     FILE *pipe = popen(cmd.c_str(), "r");
     if (!pipe)
         return "";
@@ -222,7 +235,13 @@ void install_dependencies()
     if (!venv_check.is_open())
     {
         cout << "pmp: Creating virtual environment.\n";
-        system("python3 -m venv pmp_venv >/dev/null 2>&1");
+        if (SYSTEM == "Windows")
+        {
+            system("python -m venv pmp_venv >nul 2>&1");
+        }
+        else
+            // For Linux and macOS
+            system("python3 -m venv pmp_venv >/dev/null 2>&1");
     }
 
     // Activate the virtual environment
@@ -232,12 +251,25 @@ void install_dependencies()
         const string &version = entry.value()["version"];
         cout << "pmp: Installing package: " << package << " version: " << version << endl;
 
-        string command = "bash -c 'source pmp_venv/bin/activate && pip install " + package;
-        if (!version.empty())
+        string command;
+        if (SYSTEM == "Windows")
         {
-            command += "==" + version;
+            command = "cmd /c \"pmp_venv\\Scripts\\activate && pip install " + package;
+            if (!version.empty())
+            {
+                command += "==" + version;
+            }
+            command += " >nul 2>&1\"";
         }
-        command += " >/dev/null 2>&1'";
+        else
+        {
+            command = "bash -c 'source pmp_venv/bin/activate && pip install " + package;
+            if (!version.empty())
+            {
+                command += "==" + version;
+            }
+            command += " >/dev/null 2>&1'";
+        }
 
         int resultado = std::system(command.c_str());
 
@@ -263,6 +295,10 @@ void install_dependencies()
         const string &version = entry.value()["version"];
         cout << "pmp: Installing secondary package: " << package << " version: " << version << endl;
         string command = "bash -c 'source pmp_venv/bin/activate && pip install " + package;
+        if (SYSTEM == "Windows")
+        {
+            command = "cmd /c \"pmp_venv\\Scripts\\activate && pip install " + package;
+        }
         if (!version.empty())
         {
             command += "==" + version;
@@ -308,16 +344,30 @@ void install_new_dependencies(string &package)
 
     cout << "pmp: Installing package: " << base_package << endl;
 
-    string command = "bash -c 'source pmp_venv/bin/activate && pip install " + base_package;
-    if (!version.empty())
+    string command;
+    if (SYSTEM == "Windows")
     {
-        command += "==" + version;
+        command = "cmd /c \"pmp_venv\\Scripts\\activate && pip install " + base_package;
+        if (!version.empty())
+        {
+            command += "==" + version;
+        }
+        command += " >nul 2>&1\"";
     }
-    command += " >/dev/null 2>&1'";
+    else
+    {
+        command = "bash -c 'source pmp_venv/bin/activate && pip install " + base_package;
+        if (!version.empty())
+        {
+            command += "==" + version;
+        }
+        command += " >/dev/null 2>&1'";
+    }
 
     int resultado = std::system(command.c_str());
 
-    if (resultado == 0) {
+    if (resultado == 0)
+    {
         cout << "pmp: " << base_package << " has installed correctly" << endl;
     }
 
@@ -455,7 +505,14 @@ void install(string package)
     if (!venv_check.is_open())
     {
         cout << "pmp: Creating virtual environment.\n";
-        system("python3 -m venv pmp_venv >/dev/null 2>&1");
+        if (SYSTEM == "Windows")
+        {
+            system("python -m venv pmp_venv >nul 2>&1");
+        }
+        else
+        {
+            system("python3 -m venv pmp_venv >/dev/null 2>&1");
+        }
     }
 
     if (package == "*")

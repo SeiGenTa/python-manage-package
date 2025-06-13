@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include "init.h"
+#include "utils.h"
 
 void init(){
     std::cout << "pmp: Initializing project...\n";
@@ -25,7 +26,16 @@ void init(){
 
     // Create a configuration file for the project
     std::ofstream configFile("pmp_config.json");
-    std::ifstream templateConfigFile("/usr/local/share/pmp/templates/template_config.json");
+
+    std::string configFileDir = "";
+    if (SYSTEM == "Windows") {
+        configFileDir = "C:\\tools\\pmp\\templates\\template_config.json";
+    } else {
+        configFileDir = "/usr/local/share/pmp/templates/template_config.json";
+    }
+
+
+    std::ifstream templateConfigFile(configFileDir);
     if (configFile.is_open() && templateConfigFile.is_open()) {
         std::string line;
         while (std::getline(templateConfigFile, line)) {
@@ -69,11 +79,16 @@ void init(){
         std::cout << "pmp: Failed to create main script file.\n";
     }
 
-    // Create gitignore file based in ../templates/template_gitignore
     std::ofstream gitignoreFile(".gitignore");
 
     //This 
-    std::ifstream templateFile("/usr/local/share/pmp/templates/template_gitignore");
+    std::string gitignoreFileDir = "";
+    if (SYSTEM == "Windows") {
+        gitignoreFileDir = "C:\\tools\\pmp\\templates\\template_gitignore";
+    } else {
+        gitignoreFileDir = "/usr/local/share/pmp/templates/template_gitignore";
+    }
+    std::ifstream templateFile(gitignoreFileDir);
     if (gitignoreFile.is_open() && templateFile.is_open()) {
         std::string line;
         while (std::getline(templateFile, line)) {
@@ -89,7 +104,14 @@ void init(){
     // Create a lock file for the project
     std::ofstream lockFile("pmp_lock.json");
 
-    std::ifstream pmpLockFile("/usr/local/share/pmp/templates/template_pmp_lock.json");
+    std::string lockFileDir = "";
+    if (SYSTEM == "Windows") {
+        lockFileDir = "C:\\tools\\pmp\\templates\\template_pmp_lock.json";
+    } else {
+        lockFileDir = "/usr/local/share/pmp/templates/template_pmp_lock.json";
+    }
+
+    std::ifstream pmpLockFile(lockFileDir);
 
     if (lockFile.is_open() && pmpLockFile.is_open()) {
         std::string line;

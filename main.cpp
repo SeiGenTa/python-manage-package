@@ -4,6 +4,13 @@
 #include "commands/run.h"
 #include "commands/install.h"
 #include "commands/uninstall.h"
+#include "commands/utils.h"
+
+#ifdef _WIN32
+const std::string SYSTEM = "Windows";
+#else
+const std::string SYSTEM = "Linux";
+#endif
 
 int main(int argc, char* argv[]) {
     if (argc == 0) {
@@ -67,7 +74,11 @@ int main(int argc, char* argv[]) {
     }
 
     if (command == "--version" || command == "-v") {
-        std::cout << "pmp version 0.4.2\n";
+        if (SYSTEM == "Windows") {
+            std::cout << "pmp version 0.4.2 (Windows)\n";
+            return 0;
+        }
+        std::cout << "pmp version 0.4.2 (Linux)\n";
         return 0;
     }
 
