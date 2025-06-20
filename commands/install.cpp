@@ -55,7 +55,7 @@ json get_dependence_of_package(const string &package)
         string cmd = "bash -c 'source pmp_venv/bin/activate && pip show " + pkg_base + " | grep \"^Requires:\\|^Requires-Dist:\" 2>/dev/null'";
         if (SYSTEM == "Windows")
         {
-            cmd = "cmd /c \"pmp_venv\\Scripts\\activate && pip show " + pkg_base + " | findstr \"\\\"^Requires:\\|^Requires-Dist:\\\"\" 2>nul\"";
+            cmd = "cmd /c \"pmp_venv\\Scripts\\activate && pip show " + pkg_base + " | findstr /R \"^Requires: ^Requires-Dist:\" 2>nul\"";
         }
         FILE *pipe = popen(cmd.c_str(), "r");
         if (!pipe)
@@ -149,7 +149,7 @@ string get_installed_version(const string &package)
     string cmd = "bash -c 'source pmp_venv/bin/activate && pip show " + package + " | grep ^Version: 2>/dev/null'";
     if (SYSTEM == "Windows")
     {
-        cmd = "cmd /c \"pmp_venv\\Scripts\\activate && pip show " + package + " | findstr \"\\\"^Version:\\\"\" 2>nul\"";
+        cmd = "cmd /c \"pmp_venv\\Scripts\\activate && pip show " + package + " | findstr /R \"^Version:\" 2>nul\"";
     }
     FILE *pipe = popen(cmd.c_str(), "r");
     if (!pipe)
