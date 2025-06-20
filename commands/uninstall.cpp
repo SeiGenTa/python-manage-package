@@ -115,14 +115,11 @@ void uninstall_unused_dependencies()
         return;
     }
 
-    
-  
     string command = "bash -c 'source pmp_venv/bin/activate && pip uninstall -y ";
     if (SYSTEM == "Windows")
     {
         command = "cmd /c \"pmp_venv\\Scripts\\activate && pip uninstall -y ";
     }
-
 
     ordered_json &dep_sec = pmp_config["dependencies_secondary"];
 
@@ -149,7 +146,14 @@ void uninstall_unused_dependencies()
         return;
     }
 
-    command += " >/dev/null 2>&1'";
+    if (SYSTEM == "Windows")
+    {
+        command += " >nul 2>&1\"";
+    }
+    else
+    {
+        command += " >/dev/null 2>&1'";
+    }
 
     int result = std::system(command.c_str());
 
