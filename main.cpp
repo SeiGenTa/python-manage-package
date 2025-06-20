@@ -75,10 +75,10 @@ int main(int argc, char* argv[]) {
 
     if (command == "--version" || command == "-v") {
         if (SYSTEM == "Windows") {
-            std::cout << "pmp version 0.4.2 (Windows)\n";
+            std::cout << "pmp version 0.4.5 (Windows)\n";
             return 0;
         }
-        std::cout << "pmp version 0.4.2 (Linux)\n";
+        std::cout << "pmp version 0.4.5 (Linux)\n";
         return 0;
     }
 
